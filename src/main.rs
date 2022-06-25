@@ -12,28 +12,24 @@ struct Response {
     ssh_url: Option<String>
 }
 
-
 impl fmt::Display for Response {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "message: {:?}, url: {:?}", self.message, self.ssh_url)
     }
 }
 
-
-fn command(args: &[&str]) -> Result<(), std::io::Error> {
-    let output = Command::new("git")
-    .args(&*args)
-    .stdout(Stdio::piped())
-    .spawn()?;
-    thread::sleep(Duration::from_millis(10));
-
-    Ok(())
-}
-
-
 fn main() {
+    let dir_str = env::current_dir()
+        .unwrap().to_str()
+        .unwrap().to_string();
+    let vec = dir_str.split("/").collect::<Vec<&str>>();
+    let mut name = vec[vec.len() - 1];
+    println!("Your new repo name: {}", name);
+
     let args: Vec<String> = env::args().collect();
-    let name = &args[1];
+    if args.len() > 1 {
+        name = &args[1];
+    }
 
     let repo = create_repo(name);
     match repo {
@@ -42,11 +38,20 @@ fn main() {
     }
 }
 
+fn command(args: &[&str]) -> Result<(), std::io::Error> {
+    Command::new("git")
+    .args(&*args)
+    .stdout(Stdio::piped())
+    .spawn()?;
+    thread::sleep(Duration::from_millis(50));
+
+    Ok(())
+}
 
 fn add_remote(url: &str) -> String {
-    command(&["init"]);
-    command(&["remote", "add", "origin", &url]);
-    command(&["remote", "set-url", "origin", &url]);
+    command(&["init"]).unwrap();
+    command(&["remote", "add", "origin", &url]).unwrap();
+    command(&["remote", "set-url", "origin", &url]).unwrap();
 
     format!("Added remote repo: {}", &url)
 }
@@ -56,9 +61,10 @@ fn create_repo(name: &str) -> Result<String, Box<dyn std::error::Error>> {
     let first_part = "{\"name\":\"";
     let second_part = "\"}";
     let repo_name = format!("{}{}{}", first_part, name, second_part);
+    let token = env!("TOKEN");
 
     let mut headers = header::HeaderMap::new();
-    headers.insert("Authorization", "token <TOKEN>".parse().unwrap());
+    headers.insert("Authorization", format!("token {}", token).parse().unwrap());
     headers.insert("Content-Type", "application/x-www-form-urlencoded".parse().unwrap());
 
     let res = reqwest::Client::new()
